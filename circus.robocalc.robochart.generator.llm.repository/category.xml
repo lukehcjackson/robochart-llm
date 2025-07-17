@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <feature id="circus.robocalc.robochart.generator.llm.feature" version="0.0.0">
+      <category name="robochart.generator.llm"/>
+   </feature>
+   <feature id="circus.robocalc.robochart.generator.llm.feature.source" version="0.0.0">
+      <category name="robochart.generator.llm.source"/>
+   </feature>
+   <category-def name="robochart.generator.llm" label="RoboChart LLM Generator"/>
+   <category-def name="robochart.generator.llm.source" label="RoboChart LLM Generator (Source)"/>
+</site>
