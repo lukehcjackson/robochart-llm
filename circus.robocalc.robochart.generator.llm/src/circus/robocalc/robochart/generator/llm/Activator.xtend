@@ -1,4 +1,4 @@
-package circus.robocalc.robotest.rttestergen;
+package circus.robocalc.robochart.generator.llm;
 
 import org.eclipse.ui.plugin.AbstractUIPlugin
 import org.osgi.framework.BundleContext
@@ -6,7 +6,7 @@ import org.osgi.framework.BundleContext
 
 class Activator extends AbstractUIPlugin {
 	
-	public static final String PLUGIN_ID = "circus.robocalc.robotest.rttestergen";
+	public static final String PLUGIN_ID = "circus.robocalc.robochart.generator.llm";
 	
 	static Activator plugin
 
