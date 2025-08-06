@@ -42,6 +42,11 @@ SPDX-License-Identifier: EPL-2.0
 		      <artifactId>org.eclipse.xtend.lib</artifactId>
 		      <version>${xtendVersion}</version>
 		    </dependency>
+			<dependency>
+	    		<groupId>com.azure</groupId>
+	    		<artifactId>azure-ai-inference</artifactId>
+	    		<version>1.0.0-beta.5</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
 	<build>
