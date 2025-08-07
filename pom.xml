@@ -5,7 +5,7 @@ under the terms of the Eclipse Public License 2.0 which is available at
 http://www.eclipse.org/legal/epl-2.0.
 SPDX-License-Identifier: EPL-2.0
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="https://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>circus.robocalc.robochart.generator.llm</groupId>
@@ -43,10 +43,10 @@ SPDX-License-Identifier: EPL-2.0
 		      <version>${xtendVersion}</version>
 		    </dependency>
 			<dependency>
-	    		<groupId>com.azure</groupId>
-	    		<artifactId>azure-ai-inference</artifactId>
-	    		<version>1.0.0-beta.5</version>
-			</dependency>
+      			<groupId>com.azure</groupId>
+      			<artifactId>azure-ai-openai</artifactId>
+      			<version>1.0.0-beta.16</version>
+    		</dependency>
 		</dependencies>
 	</dependencyManagement>
 	<build>

@@ -67,6 +67,10 @@ public class Handler implements IHandler {
 								String inputValue = readMultiLineInput("RoboChart LLM Generator", "Enter your prompt to modify the selected file. Read more guidance ...here...");
 
 								//pass the prompt and the contents of the selected file to the LLM
+								
+								//args can have the input prompt and the file
+								//in the main code, check args to see what we are doing with the LLM
+								//probably want to have some sort of memory - store the prompts and responses from the LLM, so in edit mode the LLM has memory of what it has already done
 					            
 					        } else {
 					        	//display an error message popup - the file selected is not a .rct or .rst, so cannot be edited with this tool
