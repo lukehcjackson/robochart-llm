@@ -17,9 +17,55 @@ import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.core.resources.IFile;
 import java.net.URI;
 import org.eclipse.ui.PlatformUI;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.ui.IWorkbenchWindow;
+import org.eclipse.ui.PlatformUI;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 
 public class Handler implements IHandler {
+	
+	public static void saveFileToSelection(String filename, String content) throws CoreException {
+        IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+        IStructuredSelection selection = (IStructuredSelection) window.getSelectionService().getSelection();
+        Object firstElement = selection.getFirstElement();
 
+        if (firstElement instanceof IResource) {
+            IResource resource = (IResource) firstElement;
+            IPath parentPath = resource.getType() == IResource.FILE 
+                               ? resource.getParent().getFullPath() // file selected → use its folder
+                               : resource.getFullPath();           // folder selected → use it directly
+
+            IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
+            IFile newFile = root.getFile(parentPath.append(filename));
+
+            try (InputStream source = new ByteArrayInputStream(content.getBytes())) {
+                if (newFile.exists()) {
+                    newFile.setContents(source, true, true, null);
+                } else {
+                    newFile.create(source, true, null);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+	
+	public String generateTimestampedFilename(String baseName, String extension) {
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS").format(new Date());
+        return baseName + "_" + timestamp + "." + extension;
+    }
+	
 	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
 		var selection = HandlerUtil.getActiveWorkbenchWindow(event).getActivePage().getSelection();
@@ -38,7 +84,9 @@ public class Handler implements IHandler {
 						String inputValue = readMultiLineInput("RoboChart LLM Generator", "Enter the requirements of your robotic system. Read more guidance ...here...");
 						
 						String[] args = {inputValue};
-						LLMgen.LLMgenMain(args);
+						String output = LLMgen.LLMgenMain(args);
+						String filename = generateTimestampedFilename("llm-output", "rct");
+						saveFileToSelection(filename, output);
 						
 					
 					/*
@@ -62,7 +110,7 @@ public class Handler implements IHandler {
 					        String[] parts = uriString.split("\\.");
 					        String ext = parts[parts.length - 1];
 
-					        if ("rct".equals(ext) || "rst".equals(ext)) {
+					        if ("rct".equals(ext)) {
 					            
 								String inputValue = readMultiLineInput("RoboChart LLM Generator", "Enter your prompt to modify the selected file. Read more guidance ...here...");
 
@@ -72,6 +120,13 @@ public class Handler implements IHandler {
 								//in the main code, check args to see what we are doing with the LLM
 								//probably want to have some sort of memory - store the prompts and responses from the LLM, so in edit mode the LLM has memory of what it has already done
 					            
+								String pathToSelection = uriString.substring(5);
+								
+								String[] args = {inputValue, pathToSelection};
+								String output = LLMgen.LLMgenMain(args);
+								String filename = generateTimestampedFilename("llm-output", "rct");
+								saveFileToSelection(filename, output);
+								
 					        } else {
 					        	//display an error message popup - the file selected is not a .rct or .rst, so cannot be edited with this tool
 					        	Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();

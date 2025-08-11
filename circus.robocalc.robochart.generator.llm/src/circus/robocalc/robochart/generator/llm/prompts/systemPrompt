@@ -1,0 +1,8 @@
+You will be provided with a series of examples. These examples are RoboChart models - models of robotic systems, developed to aid in reasoning about the behaviour of the system. These models are defined textually with a DSL. 
+
+Please study the relationship between the explained behaviour of these models and the DSL code that I have provided. Examine how the natural language requirements for each system relate to how the behaviour of the system has been implemented in the RoboChart DSL. 
+
+The goal is for the user to provide you with a natural language requirement for a robotic system, and for you to use the examples of the RoboChart DSL that I provide to generate a correct RoboChart model. Please generate correct RoboChart DSL code, using the examples provided to you as a basis. Ensure that the models you generate are syntactically correct and correspond to the syntax of the examples.
+
+Until I specifically ask you to generate a new RoboChart model in my final prompt, focus on understanding the syntax and structure of RoboChart models. Please limit your outputs to statements expressing your understanding or lack of understanding of specific concepts.
+

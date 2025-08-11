@@ -1,0 +1,633 @@
+
+The autonomous chemical detector robot moves around its environment and detects gases in the air. If a gas is detected at a particular location and at a concentration higher than a certain threshold, it triggers a flag event to signal that it has detected gas. 
+
+The design of the model for the autonomous chemical detector consists of eight .rct files. These are:
+Chemical.rct, responsible for defining key types and functions used throughout the design.
+Location.rct, responsible for defining the changeDirection operation.
+Module.rct, responsible for defining the robotic platform and its interactions with the MainController and MicroController controllers.
+MicroController.rct, responsible for interacting with the Movement state machine.
+Movement.rct, responsible for controlling the movement of the robot.
+MainController.rct, responsible for interacting with the GasAnalysis state machine.
+GasAnalysis.rct, responsible for analysing the gas detected and determining whether the concentration is high enough to stop execution and raise the flag event.
+
+Note that the Chemical.rct and Location.rct packages defined in this system are not packages that are globally available in the RoboChart DSL. In order to use the functionality described in them, they must be reproduced in the relevant project.
+
+The detailed steps for the construction of Chemical.rct are as follows:
+
+define a package Chemical
+within this package:
+
+import everything from sequence_toolkit
+this allows for the use of the function 'size'
+
+define an enumeration Status, with elements noGas and gasD
+define an enumeration Angle, with elements Left, Right, Back and Front
+
+define two types, Chem and Intensity
+then define a datatype GasSensor, with attributes c of type Chem and i of type Intensity
+
+define a function angle, which takes an argument x (a natural number) and returns an Angle
+
+define a function card, which takes an argument A (of type Set(?X) ) and returns a natural number
+Set(?X) is a generic Set definition - A can be any type of Set
+
+define a function analysis, which takes an argument gs (a sequence of GasSensor) and returns a Status
+
+define a function goreq, which takes two arguments i1 and i2, both of type Intensity, and returns a boolean
+
+define a function intensity, which takes an argument gs (a sequence of GasSensor) and returns an Intensity
+it has a precondition: the size of gs must be greater than zero
+it has a postcondition: forall x : nat | 0 < x /\ x <= size ( gs ) @ goreq ( result , gs [ x ] . i )
+that is to say, for every natural number x, if x is greater than 0 and x is less than or equal to the size of the list gs, 
+then a call to the function goreq with the arguments: 
+	1. the result of this function
+	2. the intensity value (.i) of the (x-1)th element of gs (gs[x])
+will return true
+it has a postcondition: exists y: nat | 0 < y /\ y <= size (gs) @ result == gs[y].i
+that is to say, there exists a natural number y such that y is greater than 0 and less than or equal to the size of the list gs, 
+and the result of this intensity function is equal to the intensity value (.i) of the (y-1)th element of gs (gs[y])
+
+define a function location, which takes an argument gs (a sequence of GasSensor) and returns an Angle
+it has a precondition: the size of gs must be greater than zero
+it has a postcondition: exists x : nat | 0 < x /\ x <= size ( gs ) @ gs [ x ] . i == intensity ( gs ) /\ result == angle ( x )
+that is to say, there exists a natural number x such that x is greater than 0 and less than or equal to the size of the list gs,
+and that the intensity reading of this x (gs[x].i) is equal to the intensity value of the whole gs ( intensity(gs) )
+and the result of this location function is the return value of the angle function, given the argument x
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of Chemical.rct:
+
+package Chemical
+
+enumeration Status {  noGas gasD } import sequence_toolkit::*
+enumeration Angle { Left Right Back Front }
+datatype GasSensor {
+	c : Chem
+	i : Intensity
+}
+type Chem
+type Intensity
+
+//Analyze whether there is gas or not
+function analysis( gs : Seq( GasSensor )) : Status {
+}
+function goreq(  i1 : Intensity , i2 : Intensity) : boolean {
+}
+
+//Return the highest intensity
+function intensity( gs : Seq( GasSensor )) : Intensity {
+	precondition size ( gs ) > 0
+	postcondition forall x : nat | 0 < x /\ x <= size ( gs ) @ goreq ( result , gs [ x ] . i )
+	postcondition exists y: nat | 0 < y /\ y <= size (gs) @ result == gs[y].i
+}
+function location( gs : Seq( GasSensor )) : Angle {
+	precondition size ( gs ) > 0
+	postcondition exists x : nat | 0 < x /\ x <= size ( gs ) @ gs [ x ] . i == intensity ( gs ) /\ result == angle ( x )
+}
+function angle( x : nat) : Angle { 
+}
+
+function card(A:Set(?X)): nat {
+}
+
+
+The detailed steps for the construction of Location.rct are as follows:
+
+define a package Location
+within this package:
+
+import everything from the Chemical package
+
+define an enumeration Loc, with elements left, right, and front
+
+define an operation changeDirection, which takes an argument l of type Loc
+this operation requires the interface Operations
+and defines a real-valued constant lv
+
+within changeDirection, there is an initial state with a transition to a state From
+the state From has three transitions to a final state
+one transition has the label [l==Loc::left]/move(lv, Angle::Right), which states that if l is 'left', call the move operation as defined in Operations with arguments lv and Angle::Right as defined in Chemical
+another transition has the label [l==Loc::right]/move(lv, Angle::Left)
+and another has the label [l==Loc::front]/move(lv, Angle::Back)
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of Location.rct:
+
+package Location
+import Chemical::*
+enumeration Loc { left right front  }
+
+operation changeDirection( l : Loc) {
+	initial i0
+	state From {
+	}
+	final j0
+	transition t1 {
+		from From
+		to j0
+		condition l == Loc::left
+		action move( lv , Angle::Right)
+	}
+	transition t2 {
+		from i0
+		to From
+	}
+	transition t3 {
+		from From
+		to j0
+		condition l == Loc::right
+		action move( lv , Angle::Left)
+	}
+	transition t4 {
+		from From
+		to j0
+		condition l == Loc::front
+		action move( lv , Angle::Back)
+	}
+	requires Operations const lv : real
+}
+
+
+The detailed steps for the construction of Module.rct are as follows:
+
+import everything from the Chemical and Location packages
+
+define an interface Operations, which contains three operations:
+an operation move, which takes two arguments: lv, a real number, and a, an Angle (as defined in Chemical)
+an operation randomWalk, which takes no arguments
+an operation shortRandomWalk, which takes no arguments
+
+define the operation move, which takes two arguments: lv, a real number, and a, an Angle (as defined in Chemical). this operation terminates.
+
+define the operation shortRandomWalk, which takes no arguments. this operation terminates.
+
+define the module ChemicalDetector
+
+the module ChemicalDetector contains a robotic platform, Vehicle
+the Vehicle robotic platform provides the interface Operations
+and defines four events:
+flag, gas (of type Seq(GasSensor), that is, a sequence or list of GasSensor), obstacle (of type Loc), and odometer (of type real)
+
+the module ChemicalDetector also contains references to two controllers, MicroController and MainController
+
+there is a transition from Vehicle's odometer event to the odometer event of MicroController
+there is a transition from Vehicle's obstacle event to the obstacle event of MicroController
+there is a transition from MicroController's flag event to the flag event of Vehicle
+there is a transition from Vehicle's gas event to the gas event of MainController
+each of those four transitions is async
+
+there is an async transition from the turn event of MainController to the turn event of MicroController
+there is an unlabelled transition from the stop event of MainController to the stop event of MicroController
+there is an unlabelled transition from the resume event of MainController to the resume event of MicroController
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of Module.rct:
+ 
+import Chemical::*
+import Location::*
+
+module ChemicalDetector {
+	robotic platform Vehicle {		
+		event flag
+		provides Operations event gas : Seq( GasSensor )
+		event obstacle : Loc
+		event odometer : real
+	}
+	cref ctrl_ref0 = MicroController
+	cref ctrl_ref1 = MainController
+	connection Vehicle on gas to ctrl_ref1 on gas (_async)
+	connection ctrl_ref1 on turn to ctrl_ref0 on turn  (_async)
+	connection ctrl_ref1 on stop to ctrl_ref0 on stop 
+	connection Vehicle on obstacle to ctrl_ref0 on obstacle (_async)
+	connection ctrl_ref0 on flag to Vehicle on flag  (_async)
+	connection ctrl_ref1 on resume to ctrl_ref0 on resume
+	connection Vehicle on odometer to ctrl_ref0 on odometer (_async)
+}
+
+interface Operations {
+	move(   lv : real , a : Angle)
+	randomWalk()
+	shortRandomWalk()
+}
+operation shortRandomWalk() {
+	terminates
+}
+operation move( lv : real , a : Angle) {
+	terminates
+}
+
+
+The detailed steps for the construction of MicroController.rct are as follows:
+
+import everything from the Chemical and Location packages
+
+define the controller MicroController
+this controller requires the interface Operations
+
+the controller contains a reference to the state machine Movement
+the controller contains a reference to the operation changeDirection, which takes an argument l of type Loc
+
+the controller has six events:
+odometer, a real number
+obstacle, of type Loc
+stop,
+resume,
+turn, of type Angle,
+and flag
+
+there is a transition from the flag event of the Movement state machine to the flag event of the controller
+all of the other events have transitions from their respective event in the Controller to the corresponding event of Movement
+all of the transitions for events are unlabelled
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of MicroController.rct:
+
+import Chemical::*
+import Location::*controller MicroController {
+	
+	
+	event turn : Angle
+	
+	event obstacle : Loc
+	event flag
+	event stop
+	
+	event resume
+	event odometer : real
+	requires Operations
+sref stm_ref0 = Movement
+	
+	
+	
+	
+	
+	
+connection MicroController on turn to stm_ref0 on turn
+	
+	connection MicroController on obstacle to stm_ref0 on obstacle
+	
+	connection stm_ref0 on flag to MicroController on flag
+	
+	connection MicroController on resume to stm_ref0 on resume
+	
+	connection MicroController on stop to stm_ref0 on stop
+	
+	connection MicroController on odometer to stm_ref0 on odometer
+opref op_ref0 = changeDirection
+}
+
+
+The detailed steps for the construction of Movement.rct are as follows:
+
+import everything from the Chemical and Location packages
+
+define an interface LOperations, which contains the operation changeDirection, that takes a parameter l of type Loc
+
+define a state machine Movement, which requires the Operations and LOperations interfaces
+it also defines five constant values: a real number lv, a natural number evadeTime, a natural number stuckPeriod, a real number stuckDist, and a natural number outPeriod
+it defines four variables: a of type Angle, l of type Loc, d0 of type real and d1 of type real
+it defines a clock T
+
+within the state machine, there is an initial state with a transition to the state Waiting
+the Waiting state has a during action with the operation randomWalk(), meaning that while execution is in the state Waiting the randomWalk operation will repeatedly execute
+there is a self-transition from Waiting back to Waiting with the label resume, meaning that if the resume event triggers while in the state Waiting, execution will remain in the state Waiting
+
+there is a transition from the state Waiting to the state Going, with the label turn?a
+this means that if the turn event triggers, we read in the value from turn and store it in the variable a
+
+in the state Going, there is an entry action with the operation move(lv, a)
+this means that when we enter the state Going, the move operation is called with the arguments lv and a - where a is the value we previous read and stored from the turn event
+there is a self-transition from Going back to Going with the label turn?a, meaning that if the turn event triggers while in the Going state, we again read in the value from turn and store it in the variable a, before re-entering the state Going
+
+there is a transition from the state Going to the state Waiting with the label resume
+there is a transition from the state Going to the state Avoiding with the label obstacle?l #T
+this means that when the obstacle event is triggered in the state GOing, we read in its value and store it in l, then reset the clock T
+
+the Avoiding state has an entry action:
+first, read the value from odometer and store it in d0 (odometer?d0)
+then, call changeDirection with the value l
+then, wait for evadeTime time units
+
+there is a transition from Avoiding to Waiting with the label resume
+there is a transition from Avoiding to the state TryingAgain with the label turn?a
+
+the state TryingAgain has an entry action move with the parameters lv and a
+there is a self-transition from TryingAgain to TryingAgain with the label turn?a
+there is a transition from TryingAgain to waiting with the label resume
+there is a transition from TryingAgain to the state AvoidingAgain with the label obstacle?l/odometer?d1 - which means if the obstacle event is triggered while in the state TryingAgain, read the value from obstacle and store it in l, then read the value from odometer and store it in d1
+
+there is a transition from AvoidingAgain to Waiting with the label resume
+there is a transition from AvoidingAgain to Avoiding with the label #T[since(T)<stuckPeriod\/d1-d0>stuckDist]
+that means, reset the clock T. if either the time since resetting T is less than the stuckPeriod constant, or d1-d0 is greater than the stuckDist constant, take the transition to Avoiding
+there is a transition from AvoidingAgain to the state GettingOut
+
+the state GettingOut has an entry action of the operation shortRandomWalk(), followed by a wait of outPeriod time units.
+there is a transition from GettingOut to Waiting with the label resume
+there is a transition from GettingOut to Going with the label turn?a
+
+there are transitions from Waiting, Going, GettingOut, Avoiding, AvoidingAgain, and TryingAgain to the state Found with the label stop
+that is, if the stop event is triggered at any point then execution flows to the Found state
+
+the Found state has an entry action of the move operation, with arguments 0 and Angle::Front, followed by the flag operation
+
+there is an unlabelled transition from the Found state to the final state
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of Movement.rct:
+
+import Chemical::*
+import Location::*
+
+interface LOperations {
+	changeDirection(l : Loc)
+}
+
+stm Movement {
+	requires Operations
+	requires LOperations
+	const lv : real , evadeTime : nat , stuckPeriod : nat , stuckDist : real ,
+	outPeriod : nat
+	var a : Angle , d0 : real , d1 : real
+	var l : Loc 
+	event obstacle : Loc
+	event odometer : real
+	event resume
+	
+	event turn : Angle
+	event stop
+	event flag
+	initial i1
+	state Waiting {
+		during randomWalk()
+	}
+	state Going {
+		entry move( lv , a)
+	}
+	state Found {
+		entry move( 0 , Angle::Front) ; send flag
+	}
+	final j1
+	state Avoiding {
+		entry odometer ? d0 ; changeDirection ( l ) ; wait ( evadeTime )
+	}
+	transition t1 {
+		from i1
+		to Waiting
+	}
+	transition t2 {
+		from Waiting
+		to Going
+		trigger turn ? a
+	}
+	transition t3 {
+		from Going
+		to Going
+		trigger turn ? a
+	}
+	transition t4 {
+		from Going
+		to Found
+		trigger stop
+	}
+	transition t5 {
+		from Found
+		to j1
+	}
+	state TryingAgain {
+		entry move( lv , a)
+	}
+	state AvoidingAgain {
+	}
+	state GettingOut {
+		
+	entry shortRandomWalk() ; wait ( outPeriod )
+	}
+	transition t6 {
+		from Going
+		to Avoiding
+		trigger obstacle ? l # T
+	}
+	transition t7 {
+		from Avoiding
+		to TryingAgain
+		trigger turn ? a
+	}
+	transition t8 {
+		from TryingAgain
+		to TryingAgain
+		trigger turn ? a
+	}
+	transition t9 {
+		from TryingAgain
+		to Found
+		trigger stop
+	}
+	transition t10 {
+		from TryingAgain
+		to Waiting
+		trigger resume
+	}
+	transition t11 {
+		from TryingAgain
+		to AvoidingAgain
+		trigger obstacle ? l
+		action 
+	send odometer ? d1
+	}
+	transition t12 {
+		from AvoidingAgain
+		to Avoiding
+		#T
+		condition since ( T ) < stuckPeriod \/ d1 - d0 > stuckDist
+	}
+	transition t13 {
+		from AvoidingAgain
+		to GettingOut
+		condition since ( T ) >= stuckPeriod /\ d1 - d0 <= stuckDist
+	}
+	transition t14 {
+		from GettingOut
+		to Going
+		trigger turn ? a
+	}
+	clock T
+transition t0 {
+		from Waiting
+		to Waiting
+		trigger resume
+	}
+transition t15 {
+		from Waiting
+		to Found
+		trigger stop
+	}
+	transition t16 {
+		from GettingOut
+		to Found
+		trigger stop
+	}
+	transition t17 {
+		from AvoidingAgain
+		to Found
+		trigger stop
+	}
+	transition t18 {
+		from Avoiding
+		to Found
+		trigger stop
+	}
+	transition t19 {
+		from Avoiding
+		to Waiting
+		trigger resume
+	}
+	transition t20 {
+		from GettingOut
+		to Waiting
+		trigger resume
+	}
+	transition t22 {
+		from AvoidingAgain
+		to Waiting
+		trigger resume
+	}
+transition t21 {
+		from Going
+		to Waiting
+		trigger resume
+	}
+}
+
+
+The detailed steps for the construction of MainController.rct are as follows:
+
+import everything from the Chemical and Location packages
+
+define a controller MainController
+this controller has events:
+gas, of type Seq(GasSensor)
+turn, of type Angle
+resume,
+stop
+
+the controller has a reference to a state machine GasAnalysis
+
+there is a connection from the controller to the state machine on the event gas
+there are connections from the state machine to the controller on all other events
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of MainController.rct:
+
+controller MainController {
+	
+
+	
+	event turn : Angle
+	event stop
+	
+event gas : Seq( GasSensor )
+	event resume
+sref stm_ref0 = GasAnalysis
+	connection MainController on gas to stm_ref0 on gas
+	connection stm_ref0 on turn to MainController on turn
+	connection stm_ref0 on stop to MainController on stop
+	connection stm_ref0 on resume to MainController on resume
+}
+
+import Chemical::*
+import Location::*
+
+The detailed steps for the construction of GasAnalysis.rct are as follows:
+
+import everything from the Chemical and Location packages
+
+define a state machine GasAnalysis
+this state machine has four events:
+gas, of type Seq(GasSensor),
+resume,
+stop,
+turn, of type Angle
+the state machine also defines one constant, thr, of type Intensity
+and a variable, gs, of type Seq(GasSensor)
+
+the state machine has an initial state with an unlabelled transition to the state NoGas
+there is a transition from NoGas to the state Analysis, with the label gas?gs - that is, if the gas event is triggered (i.e. gas is detected) then read the value from the gas event and store it in gs
+
+there is a transition from Analysis to NoGas with the label [analysis(gs) == Status::NoGas]/resume
+that is to say, if the result of the analysis function with the parameter gs returns Status::NoGas, trigger the resume event and execution flows to the NoGas state
+
+there is a transition from Analysis to the state GasDetected with the label [analysis(gs)==Status::gasD]
+that is, if gas is detected by the analysis function, transition to the GasDetected state
+
+there is a transition from GasDetected to the final state with the transition [goreq(intensity(gs), thr)]/stop
+that is to say, if the goreq function with the arguments intensity(gs) and thr returns true, trigger the stop event and transition to the final state
+
+there is a transition from GasDetected to the state Reading with the label [not goreq(intensity(gs), thr)]/turn!location(gs)
+that is to say, if the goreq function with the arguments intensity(gs) and thr returns false, output the value of turn to location(gs)
+
+there is a transition from the state Reading to the state Analysis with the label gas?gs
+that is, if the gas event is triggered, then read the value from the gas event and store it in gs
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of GasAnalysis.rct:
+
+import Chemical::*
+import Location::*
+
+stm GasAnalysis {
+	
+	var gs : Seq( GasSensor )
+	event gas : Seq( GasSensor ) //Seq can be treated as vector
+	event resume
+	
+	
+	const thr : Intensity
+	
+	event turn : Angle
+	event stop
+initial i1
+	state NoGas {
+	}
+	state Analysis {
+	}
+	state GasDetected {
+	}
+	transition t1 {
+		from i1
+		to NoGas
+	}
+	transition t2 {
+		from NoGas
+		to Analysis
+		trigger gas ? gs
+	}
+	transition t3 {
+		from Analysis
+		to NoGas
+		condition analysis ( gs ) == Status::noGas
+		action 
+	send resume
+	}
+	transition t4 {
+		from Analysis
+		to GasDetected
+		condition analysis ( gs ) == Status::gasD
+	}
+	final j1
+	state Reading {
+	}
+	transition t8 {
+		from GasDetected
+		to j1
+		condition goreq ( intensity ( gs ) , thr )
+		action 
+	send stop
+	}
+	transition t9a {
+		from GasDetected
+		to Reading
+		condition 
+		not goreq ( intensity ( gs ) , thr )
+		action 
+	send turn ! location ( gs )
+	}
+	transition t0 {
+		from Reading
+		to Analysis
+		trigger gas ? gs
+	}
+}
+

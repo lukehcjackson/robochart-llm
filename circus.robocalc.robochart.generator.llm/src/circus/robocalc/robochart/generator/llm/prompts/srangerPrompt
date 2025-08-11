@@ -1,0 +1,116 @@
+The SRanger robot is a simple robot, with two main functionalities: moving in a straight line, or turning 180 degrees.
+Initially, the robot moves forwards in a straight line at some linear velocity lv.
+If it detects an obstacle, it stops moving and waits for one time unit. 
+After it has waited, it begins turning at some angular velocity av. 
+Once it has made a 180 degree turn, it begins moving in a straight line again.
+
+The detailed steps for the construction of the model for the SRanger robot is as follows:
+
+everything is in the package SimFW
+
+define an interface MovementI
+	which defines two operations:
+	- move, which has parameters lv (a real number) and av (a real number)
+	- stop, which has no parameters
+	
+define an interface ObstacleI,
+	which defines an event obstacle
+	
+define a module CMovement
+this module includes the robotic platform FootBot,
+	which provides MovementI
+	and implements ObstacleI
+this module also includes a reference to the SimFW::Movement controller
+the obstacle events of FootBot and Movement are linked by an async transition
+
+define the controller Movement
+	which requires MovementI
+	and implements ObstacleI
+this controller contains a reference to the state machine SMovement
+the obstacle events of the controller Movement and the state machine SMovement are connected with a transition from the controller's event to the state machine's event
+
+define the state machine SMovement
+	which requires MovementI
+	and implements ObstacleI
+it also defines three real-valued constants, lv, av, and PI
+and a clock MBC
+the state machine consists of an initial state
+which has a transition to a state Moving
+the state Moving has an entry action of the operation move, as defined in MovementI, with parameters (lv, 0), followed by a wait of 1
+there is a transition out of the state Moving into the state Turning
+the label for this transition is obstacle #MBC/stop(); wait(1)
+that is to say, if the obstacle event is triggered, reset the clock MBC, then trigger the stop() operation as defined in MovementI and wait 1
+the Turning state has an entry action of the operation move, as defined in MovementI, with parameters (0, av), followed by a wait of 1
+there is a transition out of the state Turning into the state Moving
+the label for this transition is [since MBC >= PI/av]
+that is to say, if the value recorded by the clock MBC is greater than or equal to the value of the expression PI/av, take the transition
+equivalently, this label states that if the time since the last reset of the clock MBC, as denoted by #MBC, is greater than or equal to the value of the expression PI/av, take the transition
+
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of SRanger:
+
+package SimFW
+
+interface MovementI {
+	move( lv : real , av : real)
+stop ( )
+}
+
+interface ObstacleI {
+	
+event obstacle
+}
+
+module CMovement {
+	
+	robotic platform FootBot {
+		provides MovementI
+		uses ObstacleI
+	}
+	cref ctrl_ref0 = Movement 
+	connection FootBot on obstacle to ctrl_ref0 on obstacle
+( _async )
+}
+
+controller Movement {
+	requires MovementI
+	uses ObstacleI
+	sref stm_ref0 = SMovement
+	
+	
+connection Movement on obstacle to stm_ref0 on obstacle
+}stm SMovement {
+	requires MovementI
+	uses ObstacleI
+	const lv : real
+	const PI: real
+	clock MBC
+	initial i1
+	state Moving {
+		
+	
+	entry move( lv , 0) ; wait ( 1 )
+	}
+	state Turning {
+		entry move ( 0 , av ) ; wait ( 1 )
+	}
+	transition t1 {
+		from i1
+		to Moving
+	}
+	transition t2 {
+		from Moving
+		to Turning
+		trigger obstacle # MBC
+		action stop(); wait(1)
+	}
+	transition t3 {
+		from Turning
+		to Moving
+		condition since ( MBC ) >= PI / av
+	}
+const av : real
+}
+
+
+	

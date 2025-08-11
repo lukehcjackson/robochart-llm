@@ -13,7 +13,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
 		<maven.compiler.target>11</maven.compiler.target>
   		<tycho-version>1.7.0</tycho-version>
   		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  		<eclipse-repo.url>http://download.eclipse.org/releases/latest</eclipse-repo.url>
+  		<eclipse-repo.url>http://download.eclipse.org/releases/2019-12</eclipse-repo.url>
   		<!-- Define overridable properties for tycho-surefire-plugin -->
 		<platformSystemProperties></platformSystemProperties>
 		<moduleProperties></moduleProperties>

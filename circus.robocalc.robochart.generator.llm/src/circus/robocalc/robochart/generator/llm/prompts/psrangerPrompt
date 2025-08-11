@@ -1,0 +1,140 @@
+The probablistic SRanger robot is a simple robot, with two main functionalities: moving in a straight line, or turning 180 degrees.
+Initially, the robot moves forwards in a straight line at some linear velocity lv.
+If it detects an obstacle, it stops moving and waits for one time unit. 
+After it has waited, it begins turning at some angular velocity av. It turns left or right randomly, with a 50/50 probablity for either direction.
+Once it has made a 180 degree turn, it begins moving in a straight line again.
+
+The detailed steps for the construction of the model for the probablistic SRanger robot is as follows:
+
+everything is in the package SimFW
+
+define an interface MovementI
+	which defines two operations:
+	- move, which has parameters lv (a real number) and av (a real number)
+	- stop, which has no parameters
+	
+define an interface ObstacleI,
+	which defines an event obstacle
+	
+define a module CMovement
+this module includes the robotic platform FootBot,
+	which provides MovementI
+	and implements ObstacleI
+this module also includes a reference to the SimFW::Movement controller
+the obstacle events of FootBot and Movement are linked by an async transition
+
+define the controller Movement
+	which requires MovementI
+	and implements ObstacleI
+this controller contains a reference to the state machine SMovement
+the obstacle events of the controller Movement and the state machine SMovement are connected with a transition from the controller's event to the state machine's event
+
+define the state machine SMovement
+	which requires MovementI
+	and implements ObstacleI
+it also defines three real-valued constants, lv, av, and PI
+and a clock MBC
+the state machine consists of an initial state
+which has a transition to a state Moving
+the state Moving has an entry action of the operation move, as defined in MovementI, with parameters (lv, 0), followed by a wait of 1
+there is a transition out of the state Moving into a probabilistic junction with the label obstacle #MBC
+that is to say, the transition is taken when the obstacle event is triggered, and the clock MBC is reset
+there are two transitions out of this probabilistic junction, each with a probability of 0.5
+each transition has an action of the operation stop(), as defined in MovementI, followed by a wait of one time step
+one of these transitions leads to a state TurningRight
+the state TurningRight has an entry action of the move operation (as defined in MovementI) with the arguments 0 and av, followed by a wait of one time step
+the other transition out of the probabilistic junction leads to a state TurningLeft
+the state TurningLeft is the same as the state TurningRight, except the av argument is negated such that the robot will turn in the other direction
+both TurningLeft and TurningRight have a transition back to the state Moving, with the label [since(MBC)>=PI/av]
+that is to say, if the value recorded by the clock MBC is greater than or equal to the value of the expression PI/av, take the transition
+equivalently, this label states that if the time since the last reset of the clock MBC, as denoted by #MBC, is greater than or equal to the value of the expression PI/av, take the transition
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of the probablistic SRanger:
+
+package SimFW
+
+interface MovementI {
+	move( lv : real , av : real)
+stop ( )
+}
+
+interface ObstacleI {
+	
+event obstacle
+}
+
+module CMovement {
+	
+	robotic platform FootBot {
+		provides MovementI
+		uses ObstacleI
+	}
+	cref ctrl_ref0 = Movement 
+	connection FootBot on obstacle to ctrl_ref0 on obstacle
+( _async )
+}
+
+controller Movement {
+	requires MovementI
+	uses ObstacleI
+	sref stm_ref0 = SMovement
+	
+	
+connection Movement on obstacle to stm_ref0 on obstacle
+}stm SMovement {
+	requires MovementI
+	uses ObstacleI
+	const lv : real
+	const PI: real
+	clock MBC
+	initial i1
+	state Moving {
+		
+	
+	entry move( lv , 0) ; wait ( 1 )
+	}
+	state TurningRight {
+		entry move ( 0 , av ) ; wait ( 1 )
+	}
+	transition t1 {
+		from i1
+		to Moving
+	}
+	transition t2 {
+		from Moving
+		to p0
+		trigger  
+		obstacle
+		# MBC
+	}
+	transition t3 {
+		from TurningRight
+		to Moving
+		condition since ( MBC ) >= PI / av
+	}
+const av : real
+state TurningLeft {
+		entry move ( 0 , - av ) ; wait ( 1 )
+	}
+	probabilistic p0
+	transition t0 {
+		from p0
+		to TurningRight
+		probability 0.5
+		action stop ( ) ; wait ( 1 )
+	}
+	transition t4 {
+		from p0
+		to TurningLeft
+		probability 0.5
+		action stop ( ) ; wait ( 1 )
+	}
+	transition t5 {
+		from TurningLeft
+		to Moving
+		condition since ( MBC ) >= PI / av
+	}
+}
+
+
+

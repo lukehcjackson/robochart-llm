@@ -1,0 +1,443 @@
+The Alpha Algorithm defines the movement of robots in a swarm. Each robot in the swarm communicates with the robots around it, broadcasting its ID and receiving the ID of nearby robots. It keeps a count of the number of neighbouring robots surrounding it. The swarm moves and avoids obstacles in the environment. Periodically, the robots in the swarm execute a turn. If the number of neighbouring robots is below the threshold alpha, the robot will perform a 180 degree turn in the hopes of rejoining the main swarm. If the number of neighbouring robots is greater than or equal to alpha, the robot will perform a random turn. 
+
+The RoboChart implementation of the Alpha Algorithm consists of six files:
+	- Mathematics.rct, which defines a package containing useful mathematical functions used throughout the project.
+	- AggregationSw.rct, which defines the module, the robotic platform, and the communication between the robotic platform and the two controllers.
+	- movementC.rct, which defines the controller responsible for moving the robot.
+	- aggregation.rct, which defines the state machine containing logic for moving the robot, avoiding obstacles, and performing turns based on the value of alpha.
+	- communicationC.rct, which defines the controller responsible for communication between robots.
+	- communication.rct, which defines the state machine containing logic for communication between robots in the swarm.
+	
+Note that functionality from Mathematics.rct is only available in this project because it has been defined and implemented. In order to use this functionality in other projects, Mathematics.rct must be defined and implemented again in that project.
+
+Specific requirements for the model are as follows:
+	- The communication behaviour should consist of a broadcast followed by a receive event.
+	- The robot should start moving, and, after every obstacle, move at least once.
+	- There are no timelocks.
+	- Every state is reachable.
+	- States can be visited infinitely many times.
+	- The system does not initiate an infinite number of events within a finite time. (Zeno freedom)
+	- No more than RC continuous time units are spent in the state Receive of the state-machine Communication.
+	- The state machine Communication starts to enter the state Receive exactly every RC units.
+	- No time is spent in the state Broadcast of state machine Communication.
+	- Initially, and then after exactly RC time units, when a broadcast.Communication_id happens, then the events broadcast and receive are offered before RC time units elapse.
+	- After every MB time units, the state Turning in the state machine Movement is entered.
+	- Every time state MovementAndAvoidance is entered, up to MB time units are spent in this state.
+	- No more than 360/av time units are spent in the state Avoid of the state-machine Movement.
+	- No more than 360/av time units are spent in the state Turning of state-machine Movement.
+and the following properties are specified:
+	1) Communication behaviour is deterministic.
+	2) Communication behaviour is divergence free.
+	3) Communication behaviour is deadlock free.
+	4) Movement behaviour is nondeterministic.
+	5) Movement behaviour is divergence free.
+	6) Movement behaviour is deadlock free.
+	7) The overall model is nondeterministic.
+	8) The overall model is divergence free.
+	9) The overall model is deadlock free.
+
+Detailed steps for the construction of Mathematics.rct are as follows:
+
+define a package Mathematics
+
+define a function floor, which takes one real-valued input x, and returns an int
+
+define a function random, which takes no inputs and returns a real number
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of Mathematics.rct:
+
+package Mathematics
+
+function random() : real {
+}
+function floor( x : real) : int {
+}
+
+Detailed steps for the construction of AggregationSw.rct are as follows:
+
+define a primitive type ID
+
+define an operation move, which takes two real-valued parameters l and a
+the operation move terminates
+
+define an enumeration type Position, with members left and right
+
+define a module AggregationSoftware
+
+within the module, define a robotic platform ePuck
+this robotic platform implements the move operation described earlier
+this robotic platform defines three events:
+	broadcast, of type ID
+	receive, of type ID * ID
+	obstacle, of type Position
+	
+within the module, there are also references to two state machines:
+MovementC and CommunicationC
+
+there are bidirectional async connections between ePUck and CommunicationC on the broadcast and receive events
+there is an async connection from ePuck to MovementC on the obstacle event
+there is an async connection from the robots event of CommunicationC to the neighbours event of MovementC
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of AggregationSw.rct:
+
+type ID
+module AggregationSoftware {
+	
+	robotic platform ePuck {
+		move( l : real , a : real)
+	
+	event obstacle : Position
+	event broadcast : ID
+		event receive : ID * ID
+	}
+	cref ctrl_ref0 = MovementC
+	cref ctrl_ref1 = CommunicationC
+	connection ePuck on obstacle to ctrl_ref0 on obstacle (_async)
+	connection ePuck on receive to ctrl_ref1 on receive (_async) [mult]
+	connection ePuck on broadcast to ctrl_ref1 on broadcast (_async) [mult]
+	connection ctrl_ref1 on robots to ctrl_ref0 on neighbours (_async)
+}
+enumeration Position { left right } 
+
+operation move( l : real , a : real) {
+	terminates
+}
+
+Detailed steps for the construction of movementC.rct are as follows:
+
+define a controller MovementC
+
+this controller requires the interface MovingHw
+this controller implements the interfaces MovingHwE and SensingHw
+
+the controller defines two events:
+	obstacle, of type Position
+	neighbours, of type nat
+
+the controller contains a reference to a state machine Movement
+
+there are connections from the controller to the state machine on the obstacle and neighbours events
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of movementC.rct:
+
+controller MovementC {
+	requires MovingHw
+	uses MovingHwE 
+	uses SensingHw 
+	sref stm_ref0 = Movement
+	connection MovementC on obstacle to stm_ref0 on obstacle
+	connection MovementC on neighbours to stm_ref0 on neighbours
+}
+
+Detailed steps for the construction of aggregation.rct are as follows:
+
+import everything from the Mathematics package
+note that this package has been defined in this project. in order to use it's functionality, we must have included an implementation of Mathematics.rct somewhere in this project.
+
+define an interface SensingHw, which includes an event neighbours of type nat
+
+define an interface MovingHwE, which includes an event obstacle of type Position
+
+define an interface MovingHw, which includes an operation move, which takes two real-valued parameters l and a
+
+define a state machine Movement
+this state machine requires the interface MovingHw
+the state machine implements the interfaces MovingHwE and SensingHw
+the state machine defines four constants:
+	lv, a real number
+	av, a real number
+	MB, a real number,
+	alpha, a natural number
+the state machine defines three variables:
+	n, a natural number
+	p, a Position
+	turned, a boolean value
+the state machine defines a clock MBC
+the state machine also defines two events:
+	obstacle, of type Position
+	neighbours, of type nat
+	
+in the state machine, there is an initial state with a transition to the state MovementAndAvoidance with the label #MBC
+meaning that we reset the clock MBC when we transition from the initial state
+
+MovementAndAvoidance is a composite state, meaning it itself contains a state machine
+within MovementAndAvoidance, there is an initial state with an unlabelled transition to the state Move
+
+the Move state has an entry action of the operation move, with the arguments lv and 0
+
+there is a transition from Move to the state Avoid, with the label obstacle?p[since(MBC)<(MB-360/av)]
+an important note: in RoboChart, the guard condition denoted with [] is evaluated before the event
+in this case, if since(MBC) < (MB-360/av), then we will read in the value from obstacle and store it in p, then take the transition to Avoid
+
+the state Avoid has an entry action: if (p==Position::left) then move(0,av) else move(0,-av) end; wait (floor(random()*360/av))
+if p == Position::left, meaning the obstacle is on the left, we will turn in the direction of +av (right)
+otherwise, we will turn in the direction of -av (left)
+once turning has started, we wait for some random amount of time to allow the robot to turn
+
+there is an unlabelled transition from the Avoid state to the Move state
+
+the MovementAndAvoidance state has a transition to the Turning state with the label [since(MBC)>=MB]/#MBC
+meaning that if the time since the clock MBC was last reset is greater than or equal to MB, reset the clock MBC and take the transition to the state Turning
+
+the Turning state has an entry action neighbours?n ; turned = false
+when the Turning state is entered, the value in the neighbours event is stored in n, and subsequently the variable turned is set to false
+
+the Turning state is also a composite state, meaning it contains a state machine
+there is an initial state, with a transition into a junction
+
+this junction has two transitions out of it. 
+the first transition has the label [n<alpha] and leads to the state Turn180
+this means that if the value in n is less than the constant alpha, take the transition to the state Turn180
+the second transition has the label [n>=alpha] and leads to the state RandomTurn
+this means that if the value in n is greater than or equal to the constant alpha, take the transition to the state RandomTurn
+
+the state Turn180 has an entry action move(0,av) followed by a wait of floor(180/av) time units
+this means that once Turn180 is entered, the robot begins turning. then wait until the robot has turned 180 degrees
+there is a transition out of Turn180 with the label /turned = true
+this means that, as soon as the wait in the entry action is complete, take the transition to the final state
+the action of this transition sets the turned variable to true, then execution moves to the final state
+
+the state RandomTurn has an entry action move(0,av) followed by a wait of floor(random()*360/av))
+this is similar to the entry action of Turn180, but instead here the robot turns some random amount, determined by random()*360
+there is a transition out of RandomTurn with the label /turned = true
+this means that, as soon as the wait in the entry action is complete, take the transition to the final state
+the action of this transition sets the turned variable to true, then execution moves to the final state
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of aggregation.rct:
+
+import Mathematics::*
+interface MovingHw {
+	move( l : real , a : real)
+}
+interface MovingHwE {
+	event obstacle : Position
+}
+
+interface SensingHw {
+event neighbours : nat
+}
+stm Movement {
+	requires MovingHw
+	uses MovingHwE
+	uses SensingHw
+	const lv : real , av : real, MB : real, alpha : nat
+	var n : nat, p : Position, turned : boolean
+	clock MBC
+	initial i1
+	state MovementAndAvoidance {
+		initial i1
+		state Move {
+			entry move( lv , 0)   
+		}      
+		state Avoid {
+			
+		entry if ( p == Position::left ) then move( 0 , av) else move( 0 , - av) end ;
+			wait ( floor (random ( ) * 360 / av) )
+		}
+		transition t1 {
+			from i1
+			to Move
+		}
+		transition t2 { 
+			from Move
+			to Avoid
+			trigger obstacle ? p
+			condition since ( MBC ) < (MB - 360 / av)
+		}
+		transition t3 {
+			from Avoid
+			to Move
+		}
+	}
+	state Turning {
+	initial i1
+		junction j1
+		state Turn180 {
+		
+		
+		entry move( 0 , av) ; wait ( floor(180 / av) )
+		}
+		state RandomTurn {
+		entry move( 0 , av) ; wait ( floor(random ( ) * 360 / av) )
+		}
+		final f1
+		transition t1 {
+			from i1  
+			to j1
+		}
+		transition t2 {
+			from j1
+			to Turn180
+			condition n < alpha
+		}
+		transition t3 {
+			from j1
+			to RandomTurn
+			condition n >= alpha
+		}
+	transition t4 {
+			from Turn180
+			to f1
+			action turned = true
+		}
+		transition t5 {
+			from RandomTurn
+			to f1
+			action turned = true
+		}
+		entry send neighbours ? n ; turned = false
+	}
+	transition t1 {
+		from i1
+		to MovementAndAvoidance
+		# MBC
+	}
+transition t2 {
+		from MovementAndAvoidance
+		to Turning
+		condition since ( MBC ) >= MB
+		action # MBC
+	}
+	transition t3 {
+		from Turning
+		to MovementAndAvoidance
+		condition turned == true
+	}
+}
+
+
+Detailed steps for the construction of communicationC.rct are as follows:
+
+define a controller CommunicationC
+
+this controller implements the interfaces CommHw and Internal
+
+this controller defines three events:
+	broadcast, of type ID
+	receive, of type ID * ID
+	robots, of type nat
+	
+this controller contains a reference to the state machine Communication
+
+there are bidirectional connections between the broadcast and receive events of CommunicationC and Communication
+there is a connection between the robots event of Communication and the robots event of CommunicationC
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of communicationC.rct:
+
+controller CommunicationC {
+	uses CommHw uses Internal sref stm_ref0 = Communication
+	connection stm_ref0 on robots to CommunicationC on robots
+	connection stm_ref0 on receive to CommunicationC on receive [mult]
+	connection stm_ref0 on broadcast to CommunicationC on broadcast [mult]
+}
+
+Detailed steps for the construction of communication.rct are as follows:
+
+import everything from the set_toolkit and sequence_toolkit packages
+remember, these packages are included with RoboChart and so can be imported freely without having to be defined elsewhere
+
+define the interface Internal, which contains an event robots of type nat
+
+define the interface CommHw, which contains events broadcast of type ID and receive of type ID * ID
+
+define the state machine Communication
+this state machine implements interfaces CommHw and Internal
+it also defines two constants:
+	id, of type ID
+	RC, of type nat
+it defines three variables:
+	x, of type ID * ID
+	y, of type ID
+	neighs, of type Set(ID)
+it defines a clock RCC
+
+Communication contains an initial state with an unlabelled transition to the state Broadcast
+
+the state Broadcast has an entry action broadcast!id<{0}
+this means to output the value in id on the event broadcast. the <{0} is a deadline - this step must execute within a time window of 0 time units, i.e. immediately
+
+there is a transition from Broadcast to the state Receive with the label #RCC/neighs = {}
+when this transition is taken, reset the clock RCC and set neighs to an empty set {}
+
+the state Receive has two self-transitions
+there is a transition from Receive back to Receive with the label receive?x[x[1]==id/\(since(RCC)<RC)]/neighs=union(neighs,{x[2]})
+the order of operations here is: looking at the current instance of x, if the 1st element of x is equal to the id constant, and the time since the clock RCC was last reset is less than the constant RC, then read the value stored in the receive event and store it in x. this is the new value of x. using this new value of x, neighs is set equal to the union of the current value of neighs, and the 2nd element of the new value of x.
+note that tuples in robochart are 1-indexed. their first element is [1].
+
+there is a transition from Receive back to Receive with the label broadcast?y[since(RCC)<RC]/receive!(|y, id|)<{0}
+this means, if the time since the clock RCC was last reset is less than the value of the constant RC, then save the value in the broadcast event in the variable y, then output the tuple (y, id) on the event receive within 0 time units - i.e. immediately
+an important note: in robochart, we execute the guard before the input/output (marked with ? or !), and then perform the action
+
+there is a transition from Receive to Broadcast with the label [since(RCC)>=RC]/robots!(size(neighs))
+this means, if the time since the clock RCC was last reset is greater than or equal to the value of the constant RC, then output the size of the neighs variable on the robots event
+we can only use the size variable here because we have imported everything from sequence_toolkit
+
+Here is the RoboChart DSL code that corresponds to that detailed description of the construction of communication.rct:
+
+import set_toolkit::*    
+import sequence_toolkit::*
+interface CommHw {
+	event broadcast : ID 
+	event receive : ID * ID
+}
+interface Internal {
+	event robots : nat
+}
+stm Communication {
+	uses CommHw       
+	uses Internal 
+	const id : ID
+	var x : ID * ID , y : ID
+	var neighs : Set( ID )
+	const RC : nat
+	clock RCC
+	initial i1
+	state Broadcast {
+		
+	 
+	 
+	  
+	  
+	entry broadcast ! id <{ 0 }  
+	}
+	state Receive {
+	}
+	transition t1 {
+		from i1
+		to Broadcast
+	}  
+	transition t2 {
+		from Receive
+		to Receive
+		trigger receive ? x 
+		condition ( x [ 1 ] == id ) /\ ( since ( RCC ) < RC )
+		action neighs = union ( neighs , { x [ 2 ] } )
+	}
+	transition t3 {
+		from Receive
+		to Receive
+	trigger broadcast ? y
+		condition since ( RCC ) < RC
+		action receive ! (| y , id |) <{ 0 }
+	}
+
+	transition t4 {
+		from Broadcast
+		to Receive
+		# RCC
+		action neighs = { }
+	}
+
+	transition t5 {
+		from Receive
+		to Broadcast
+		condition since ( RCC ) >= RC
+		action 
+		send robots ! (size ( neighs ))
+	}
+}
+
+
+
+
+

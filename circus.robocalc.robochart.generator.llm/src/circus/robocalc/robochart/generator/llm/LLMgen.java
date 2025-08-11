@@ -2,6 +2,14 @@ package circus.robocalc.robochart.generator.llm;
 
 import java.util.Arrays;
 import java.util.List;
+
+import org.eclipse.core.runtime.Platform;
+import org.osgi.framework.Bundle;
+import java.io.File;
+import java.net.URL;
+import org.eclipse.core.runtime.FileLocator;
+
+
 import java.util.ArrayList;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -45,6 +53,7 @@ public final class LLMgen {
         /*
          * Testing: Has that object been constructed correctly?
          */
+        /*
         System.out.println("--------- NEW CHAT -----------");
         for (ChatRequestMessage message : chatMessages) {
             String role = message.getRole().toString(); // Convert ChatRole enum to String
@@ -63,6 +72,7 @@ public final class LLMgen {
 
             System.out.println("[" + role + "]: " + content + "\n");
         }
+        */
 
         ChatCompletions chatCompletions = client.getChatCompletions(deploymentOrModelId, new ChatCompletionsOptions(chatMessages));
         String finalResponse = chatCompletions.getChoices().get(0).getMessage().getContent();
@@ -92,12 +102,17 @@ public final class LLMgen {
 
         return builder.toString().trim();
     }
+    
+    public static String getResourcePath(String pluginId, String relativePath) throws Exception {
+        Bundle bundle = Platform.getBundle(pluginId);
+        URL fileURL = bundle.getEntry(relativePath); // relative to plugin root
+        URL resolvedURL = FileLocator.toFileURL(fileURL);
+        return resolvedURL.getPath(); // this is your String path
+    }
 
-    public static void LLMgenMain(String[] args) {
+    public static String LLMgenMain(String[] args) throws Exception {
         //Should have these as an option to be set in the eclipse preferences menu
-        String key = ";
-        String endpoint = "";
-        String deploymentOrModelId = "";
+
 
 
         OpenAIClient client = new OpenAIClientBuilder()
@@ -105,30 +120,44 @@ public final class LLMgen {
             .endpoint(endpoint)
             .buildClient();
 
-        //replace with a line that gets working directory
-        //String wd = "/home/luke/Documents/demo";
+        //get the prompts directory
+        String wd = getResourcePath("circus.robocalc.robochart.generator.llm", "src/circus/robocalc/robochart/generator/llm/prompts/");
 
-        //String systemMessage       = asString(wd + "/systemPrompt");
-        String systemMessage = "You are a helpful assistant. Reply to each message with exactly the contents of the message, followed by a random word of your choice.";
-        //String SRangerPrompt       = asString(wd + "/srangerPrompt");
-        String SRangerPrompt = "yadada fadfa ";
-        //String PSRangerPrompt      = asString(wd + "/psrangerPrompt");
-        //String AutonomousGasPrompt = asString(wd + "/autoGasPrompt");       
-        //String AlphaPrompt         = asString(wd + "/alphaPrompt");
-        String AlphaPrompt = "hehehehe hoohhohoho";
+        //load the prompts from files
+        String systemMessage       = asString(wd + "systemPrompt");
+        String SRangerPrompt       = asString(wd + "srangerPrompt");
+        String PSRangerPrompt      = asString(wd + "psrangerPrompt");
+        String AutonomousGasPrompt = asString(wd + "autoGasPrompt");       
+        String AlphaPrompt         = asString(wd + "alphaPrompt");
 
-        String tempUserPrompt = "Using the examples of the DSL I have provided you, please generate DSL code that corresponds to the requirements for this new robotic system: 'The robot performs a random walk. While doing so, it detects the light level of the environment. If the brightness of the light is greater than some threshold, a flag event is raised and execution stops.'";
-
+        String userPromptSuffix = "\nAnswer only with your DSL code in plain text. Do not include anything that could not be directly loaded into a RoboChart file and run. Consider your answer carefully.";
+        
+        //construct the prompt based on whether we are in edit mode or generate mode
+        //this is determined by whether we pass a file in args[] so if args.length > 1 we are in edit mode and args[1] is the file to edit
+        //args[0] is the user's input
+        String userPrompt = "";
+        if (args.length > 1) {
+        	String editPromptPrefix = "Using the examples of the DSL I have provided you, please edit the following DSL code corresponding with these requirements: \n";
+        	String editPromptContents = "\nDSL code: \n" + asString(args[1]);
+            userPrompt = editPromptPrefix + args[0] + editPromptContents + userPromptSuffix;
+        } else {
+        	String userPromptPrefix = "Using the examples of the DSL I have provided you, please generate DSL code that corresponds to the requirements for this new robotic system: \n";
+            userPrompt = userPromptPrefix + args[0] + userPromptSuffix;
+        }
+        System.out.println(userPrompt);
+        
+        //construct an object which holds all of our prompts to be passed to the LLM
         List<String> allPrompts = Arrays.asList(
             SRangerPrompt,
- //           PSRangerPrompt,
-//            AutonomousGasPrompt,
-            AlphaPrompt
+            //PSRangerPrompt,
+            //AutonomousGasPrompt,
+            //AlphaPrompt,
+            userPrompt
         );
         List<String> prompts = new ArrayList<String>();
         List<String> responses = new ArrayList<String>();
 
-        
+        //pass the prompts to the LLM and record the responses
         for (String prompt : allPrompts) {
             prompts.add(prompt);
             responses.add(getResponse(deploymentOrModelId, client, systemMessage, prompts, responses));
@@ -140,6 +169,8 @@ public final class LLMgen {
             System.out.println(prompts.get(i) + "\n");
             System.out.println(responses.get(i) + "\n");
         }
+        
+        return responses.get(responses.size() - 1);
     }
 }
 
